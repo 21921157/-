@@ -16,8 +16,7 @@
 <br />&emsp;&emsp;1、空闲链表随机化
 <br />&emsp;&emsp;为了解决空闲链表连续性的问题，在申请整块较大的内存后，对该内存空间进行切分并创建链表管理时，将空闲链表在创建的时候进行随机排列，然后再由链表连接起来，这样消除了链表顺序与地址空间连续性之间的联系。
 ```
-static void freelist_randomize(struct rnd_state *state, unsigned int *list,
-                   unsigned int count)
+static void freelist_randomize(struct rnd_state *state, unsigned int *list,unsigned int count)
 {
     unsigned int rand;
     unsigned int i;
