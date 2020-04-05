@@ -4,7 +4,7 @@
 <br />&emsp;&emsp;1、地址生长方向由低到高。
 <br />&emsp;&emsp;2、堆实现内存按需分配。内存分配不是根据地址先后顺序，而是由申请的内存大小决定；同时，使用时申请并分配，使用完毕时释放归还。
 <br />&emsp;&emsp;3、以链表结构进行管理。由于内存分配往往按页（4K）来分配，而堆进行分配的对象往往都比较小。为了减小系统开销，堆的内存使用会先申请一块较大的内存区域，并根据使用对象的大小、用户需求划分成许多小块地址空间，同时以链表的形式将这些分散的内存区域统一管理起来。用户申请时根据申请对象大小在其中的空闲链表中查找最适合的（根据分配策略）进行分配。
-![](4.png)
+![](5.png)
 <br />二、堆的安全问题
 <br />&emsp;&emsp;堆所面临的威胁主要是针对堆的缓冲区溢出攻击，也称为堆溢出（heap overflow）。在系统中，大约有一半的安全信息泄漏都是来源于堆溢出，因为堆内存中的对象存有函数指针、安全相关的变量等。它们会对程序的执行产生影响，会改变程序的行为与跳转等，如条件判断的时候分支跳转、函数指针的执行跳转等，攻击者需要对它们进行攻击来达到控制程序的目的。
 <br />&emsp;&emsp;堆的安全威胁来自于固有的机制，这些来自于内存管理中存在的漏洞。
@@ -33,17 +33,14 @@ static void freelist_randomize(struct rnd_state *state, unsigned int *list,
 ```
 <br />&emsp;&emsp;2、链表指针地址加密。链表的前向指针和后向指针位于堆分配对象的首尾部，位置固定且重要，为此通过加密该指针，至少使其在内存中不是以明码的方式存在，防止整个链表进一步泄漏。如slub空闲链表指针进行了简单的异或处理，存入时异或运算加密，取出时再一次异或解密恢复即可使用，其中依赖于产生的一个随机数强化加密效果。虽然安全措施较为简单、强度不是很高，但简单的运算效率高、引入的系统开销少，且能够一定程度减缓安全威胁。
 ```
-static inline void *freelist_dereference(const struct kmem_cache *s,
-					 void *ptr_addr)
+static inline void *freelist_dereference(const struct kmem_cache *s,void *ptr_addr)
 {
-	return freelist_ptr(s, (void *)*(unsigned long *)(ptr_addr),
-			    (unsigned long)ptr_addr);
+	return freelist_ptr(s, (void *)*(unsigned long *)(ptr_addr),  (unsigned long)ptr_addr);
 }
 
 ```
 ```
-static inline void *freelist_ptr(const struct kmem_cache *s, void *ptr,
-				 unsigned long ptr_addr)
+static inline void *freelist_ptr(const struct kmem_cache *s, void *ptr,unsigned long ptr_addr)
 {
 #ifdef CONFIG_SLAB_FREELIST_HARDENED
 	return (void *)((unsigned long)ptr ^ s->random ^ ptr_addr);
@@ -55,18 +52,18 @@ static inline void *freelist_ptr(const struct kmem_cache *s, void *ptr,
 <br />3、边界检测
 <br />&emsp;&emsp;为了防止一个堆对象操作影响到相邻的对象，需要在写入操作时进行边界检测，防止溢出而覆写到不应该触及的位置。如PAX_USERCOPY中包含了堆的边界检测，在内核和用户空间数据交互时对堆的边界进行检测，判断地址所在也是否在slab中，并且是否存在跨页的情况等，以此防止溢出或越界。
 ```
-static inline void check_heap_object(const void *ptr, unsigned long n,
-                     bool to_user)
+static inline void check_heap_object(const void *ptr, unsigned long n,bool to_user)
 {
     struct page *page;
 
     if (!virt_addr_valid(ptr))
         return;
+	
     page = virt_to_head_page(ptr);
 
-    if (PageSlab(page)) {/* 是否为slab的管理页. 在slab里面*/
+    if (PageSlab(page)) {
         /* Check slab allocator for flags and size. */
-        __check_heap_object(ptr, n, page, to_user);/* 在usercopy region里面 */
+        __check_heap_object(ptr, n, page, to_user);
     } else {
         /* Verify object does not incorrectly span multiple pages. */
         check_page_span(ptr, n, page, to_user);
@@ -76,8 +73,7 @@ static inline void check_heap_object(const void *ptr, unsigned long n,
 4、释放清空
 <br />&emsp;&emsp;在对于堆内存的释放回收时，根据需要将该回收对象清零。这个操作是会带来额外的开销，所以并不是所有的释放都要进行清零。而是根据对象的数据敏感程度、安全策略、控制信息等来决定。
 ```
-void ___cache_free(struct kmem_cache *cachep, void *objp,
-        unsigned long caller)
+void ___cache_free(struct kmem_cache *cachep, void *objp,unsigned long caller)
 {
   …
     if (unlikely(slab_want_init_on_free(cachep)))
